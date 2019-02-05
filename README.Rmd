@@ -1,0 +1,306 @@
+---
+title: "Twitter Analysis of #OpenConCascadia19"
+author: "Eric Leung"
+date: "2019-02-04"
+output:
+  github_document:
+    toc: true
+    df_print: "kable"
+---
+
+# Objectives
+
+# Data Management
+
+```{r Look up tweets from ID, eval=FALSE}
+# Saved file name
+opencon_file <- "openconcascadia_search-ids.rds"
+# Download status IDs file
+download.file(
+  "https://github.com/erictleung/openconcascadia19/blob/master/data/search-ids.rds?raw=true",
+  opencon_file
+)
+
+# Read status IDs fromdownloaded file
+ids <- readRDS(opencon_file)
+
+# Lookup data associated with status ids
+rt <- rtweet::lookup_tweets(ids$status_id)
+```
+
+
+# Packages!
+
+```{r Load packages, warning=FALSE}
+# Load main packages
+library(rtweet)
+
+# tidyverse and related packages
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(purrr)
+library(stringr)
+library(tidytext)
+
+# Ancillary i.e., used once or twice in analysis
+library(here)
+library(syuzhet)
+library(rvest)
+```
+
+
+# Query Tweets
+
+```{r Query tweets with hashtag, message=FALSE}
+# Search for "#OpenConCascadia19" hashtag
+rt <- search_tweets(
+  q = "#OpenConCascadia19",
+  n = 2000,
+  verbose = FALSE)
+```
+
+And let's save for easy dissemination.
+
+```{r Save Twitter data}
+# Create data directory if it doesn't exist
+out_dir <- here("data")
+dir.create(out_dir)
+
+# Save out data
+saveRDS(rt, here("data", "search.rds"))
+saveRDS(rt, here("data", "search-ids.rds")) # Sharable data with just the IDs
+```
+
+
+# Explore Twitter
+
+## Tweet frequency over time
+
+The following summarizes Twitter data into a time series-like data frame. It is
+then plotted over time (in 2-hour increments).
+
+```{r Plot tweet frequency}
+rt %>%
+  filter(created_at > as.POSIXct("2019-01-31")) %>%
+  ts_plot("2 hours", color = "transparent") +
+  geom_smooth(method = "loess",
+              se = FALSE,
+              span = 0.1,
+              size = 2,
+              colour = "#0066aa") +
+  geom_point(size = 5,
+             shape = 21,
+             fill = "#ADFF2F99",
+             colour = "#000000dd") +
+  theme_minimal(base_size = 15) +
+  theme(axis.text = element_text(colour = "#222222"),
+        plot.title = element_text(size = rel(1.2),
+                                  face = "bold"),
+        plot.subtitle = element_text(size = rel(0.9)),
+        plot.caption = element_text(colour = "#444444")) +
+  labs(title = "Frequency of tweets about #OpenConCascadia19 over time",
+       subtitle = "Twitter status counts aggregated using two-hour intervals",
+       caption = "\n\nSource: Data gathered via Twitter's standard `search/tweets` API using rtweet",
+       x = NULL,
+       y = NULL)
+```
+
+
+## Content sentiment as positive or negative
+
+Let's do some sentiment analysis of our tweets. But before that, let's clea up
+our tweets and remove some distractors from our analysis
+
+```{r Clean tweets for sentiment}
+# Clean up tweet text
+rt <- rt %>%
+  # Remove mentions
+  # Rule are that names are alphanumeric and can have underscores.
+  # Names can also be preceeded with "." or end with some punctuation
+  # Twitter:
+  #   https://help.twitter.com/en/managing-your-account/twitter-username-rules
+  # To avoid emails:
+  #   https://stackoverflow.com/questions/4424179/how-to-validate-a-twitter-username-using-regex#comment21201837_4424288
+  mutate(clean_text = str_replace_all(text,
+                                 "\\.?@([:alnum:]|_){1,15}(?![.A-Za-z])[:graph:]?",
+                                 "")) %>%
+
+  # Remove hashtags
+  mutate(clean_text = str_replace_all(clean_text,
+                                 "#[:graph:]+",
+                                 "")) %>%
+
+  # Remove links
+  mutate(clean_text = str_replace_all(clean_text,
+                                 "https?[:graph:]+",
+                                 "'")) %>%
+
+  # Convert to lowercase
+  mutate(clean_text = str_to_lower(clean_text)) %>%
+
+  # Trim extra write space
+  mutate(clean_text = str_trim(clean_text)) %>%
+
+  # Reduce repeated whitespace inside a string
+  # E.g. str_squish("hello    world") -> "hello world"
+  mutate(clean_text = str_squish(clean_text))
+```
+
+Now that we've cleaned up the tweets a bit we can do some sentiment analysis!
+
+```{r Perform sentiment}
+# Estimate sentiment for each tweet
+rt <- rt %>%
+  mutate(sentiment = get_sentiment(clean_text, "syuzhet"))
+
+# Write function to round time into rounded var
+round_time <- function(x, sec) {
+  as.POSIXct(hms::hms(as.numeric(x) %/% sec * sec))
+}
+
+# Plot by specified time interval (1-hours)
+rt %>%
+  mutate(time = round_time(created_at, 60 * 60)) %>%
+  group_by(time) %>%
+  summarise(sentiment = mean(sentiment, na.rm = TRUE)) %>%
+  mutate(valence = ifelse(sentiment > 0L, "Positive", "Negative")) %>%
+  ggplot(aes(x = time, y = sentiment)) +
+  geom_smooth(method = "loess",
+              span = 0.1,
+              colour = "#aa11aadd",
+              fill = "#bbbbbb11") +
+  geom_point(aes(fill = valence, colour = valence),
+             shape = 21,
+             alpha = 0.6,
+             size = 3.5) +
+  theme_minimal(base_size = 15) +
+  theme(legend.position = "none",
+        axis.text = element_text(colour = "#222222"),
+        plot.title = element_text(size = rel(1.2), face = "bold"),
+        plot.subtitle = element_text(size = rel(0.9)),
+        plot.caption = element_text(colour = "#444444")) +
+  scale_fill_manual(values = c(Positive = "#2244ee", Negative = "#dd2222")) +
+  scale_colour_manual(values = c(Positive = "#001155", Negative = "#550000")) +
+  labs(x = NULL,
+       y = NULL,
+       title = "Sentiment (valence) of OpenCon Cascadia tweets over time",
+       subtitle = "Mean sentiment of tweets aggregated in one-hour intervals",
+       caption = "\nSource: Data gathered using rtweet. Sentiment analysis done using syuzhet")
+```
+
+
+## Popular emojis
+
+Here is the full official list of emojis:
+http://unicode.org/emoji/charts/full-emoji-list.html.
+
+```{r Get all emojis}
+emoji_page <- read_html("http://unicode.org/emoji/charts/full-emoji-list.html")
+```
+
+Now that we have these emojis, let's extract just the emoji stuff.
+
+```{r}
+emoji_tab <- emoji_page %>%
+  html_node("table") %>%
+  html_table(header = FALSE)
+```
+
+Almost there! Now just gotta fix up this table to be usable.
+
+```{r}
+emoji_check <- emoji_tab %>%
+  select(X1, X2, X3, X15) %>%
+  rename(ID = X1, code = X2, unicode = X3, shortname = X15) %>%
+  filter(code != "Code") %>%
+  filter(!str_detect(ID, "[:alpha:]")) %>%
+
+  # Separate rows with various number of emojis
+  mutate(num_spaces = str_count(code, " ")) %>%
+  mutate(num_spaces_uni = str_count(unicode, " ")) %>%
+  mutate(consistent = (num_spaces == num_spaces_uni))
+  nest(-num_spaces) %>%
+  mutate(data = map(data, function(df) {
+    separate_rows(df, code, unicode)
+  })) %>%
+  unnest()
+View(emoji_check)
+```
+
+Now that we have this table, we can do some analyses!
+
+```{r Find popular emojis}
+
+```
+
+
+## Explore social network of Twitter attendees
+
+```{r}
+
+```
+
+
+## Top associated hashtags
+
+What were the most associated hashtags with OpenCon Cascadia?
+
+```{r}
+
+```
+
+
+## How verbose are people tweeting?
+
+```{r}
+
+```
+
+
+## Casing variation of hashtag
+
+Which one was more popular? `#OpenConCascadia19`? Or `#openconcascadia19`?
+
+```{r}
+
+```
+
+## Create chatterplot of common words
+
+```{r}
+
+```
+
+
+# Commonly Shared Resources and Links
+
+```{r}
+
+```
+
+
+# Helpful Resources in Analysis
+
+Here are all of the links that have helped me analyze all of the above.
+
+- Example Twitter analyses
+  - [Data collection and visualization of #NCA17 tweets](https://github.com/mkearney/NCA17)
+  - [Tracking and analyzing tweets about the 2018 National Communication Conference](https://github.com/mkearney/NCA18)
+  - [A repository for tracking tweets about rstudio::conf](https://github.com/mkearney/rstudioconf_tweets)
+- [Search emoji using `stringr`](https://stackoverflow.com/a/43370630) - I was
+  going to try and remove emojis for my analysis, but I could find a way. This
+  was the closest I could get to removing. It didn't work on my Windows machine.
+- [Can We Please Stop Using Word Clouds](https://towardsdatascience.com/can-we-please-stop-using-word-clouds-eca2bbda7b9d) -
+  Gave me the idea of using Sankey diagrams and then giving me the idea of using
+  LDA from mentioning cluster maps.
+- [RIP wordclouds, long live CHATTERPLOTS](https://towardsdatascience.com/rip-wordclouds-long-live-chatterplots-e76a76896098) -
+  I found this alternative to word clouds really inspiring and useful.
+- [Text Mining with R](https://www.tidytextmining.com) - General everything help
+  on analyzing text, which I have no experience with.
+
+# Session Information
+
+```{r}
+sessionInfo()
+```
