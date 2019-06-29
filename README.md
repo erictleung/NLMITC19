@@ -41,7 +41,7 @@ But instead, here I’ll just look up the status IDs.
     } else {
       # Download status IDs file
       download.file(
-        "https://github.com/erictleung/ids/blob/master/data/search-ids.rds?raw=true",
+        "https://github.com/erictleung/NLMITC19/blob/master/data/nlmitc19_search-ids.rds?raw=true",
         ids_file
       )
 
