@@ -1,346 +1,234 @@
 ---
-title: "Twitter Analysis of #OpenConCascadia19"
+title: "#NLMITC19 Twitter Analysis"
 author: "Eric Leung"
-date: "2019-02-04"
 output:
-  github_document:
-    toc: true
-    df_print: "kable"
+    md_document:
+      toc: true
+      df_print: "kable"
 ---
 
-# Objectives
-
-# Data Management
-
-```{r Look up tweets from ID, eval=FALSE}
-# Saved file name
-opencon_file <- "openconcascadia_search-ids.rds"
-# Download status IDs file
-download.file(
-  "https://github.com/erictleung/openconcascadia19/blob/master/data/search-ids.rds?raw=true",
-  opencon_file
-)
-
-# Read status IDs fromdownloaded file
-ids <- readRDS(opencon_file)
-
-# Lookup data associated with status ids
-rt <- rtweet::lookup_tweets(ids$status_id)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, collapse = TRUE)
 ```
 
+## Load libraries
 
-# Packages!
-
-```{r Load packages, warning=FALSE}
-# Load main packages
-library(rtweet)
-
-# tidyverse and related packages
-library(ggplot2)
-library(dplyr)
-library(tidyr)
-library(purrr)
-library(stringr)
+```{r load_packages, message=FALSE, warning=FALSE}
+library(tidyverse)
 library(tidytext)
+library(ggrepel)
 
-# Ancillary i.e., used once or twice in analysis
-library(here)
-library(syuzhet)
-library(stringi)
-library(rvest)
+if (!requireNamespace("rtweet", quietly = TRUE)) install.packages("rtweet")
+library(rtweet)
 ```
 
 
-# Query Tweets
+## Query data
 
-```{r Query tweets with hashtag, message=FALSE}
-# Search for "#OpenConCascadia19" hashtag
-rt <- search_tweets(
-  q = "#OpenConCascadia19",
-  n = 2000,
-  verbose = FALSE)
+Below is the code to query the Twitter data for the `#NLMITC19`.
+
+```{r query_tweets, eval=FALSE}
+rt <- search_tweets("#NLMITC19 OR #NLMIT19", n = 1800, include_rts = FALSE)
+
+saveRDS(rt, "nlmitc19_search.rds")
+saveRDS(rt$status_id, "nlmitc19_search-ids.rds")
 ```
 
-And let's save for easy dissemination.
+But instead, here I'll just look up the status IDs.
 
-```{r Save Twitter data}
-# Create data directory if it doesn't exist
-out_dir <- here("data")
-dir.create(out_dir)
+```{r read_in_data}
+ids_file <- "nlmitc19_search-ids.rds"
+nlmitc19_file <- "nlmitc19_search.rds"
 
-# Save out data
-saveRDS(rt, here("data", "search.rds"))
-saveRDS(rt, here("data", "search-ids.rds")) # Sharable data with just the IDs
+
+# Read in search directly if exists
+if (file.exists(nlmitc19_file)) {
+  rt <- readRDS(nlmitc19_file)
+} else {
+  # Download status IDs file
+  download.file(
+    "https://github.com/erictleung/ids/blob/master/data/search-ids.rds?raw=true",
+    ids_file
+  )
+
+  # Read status IDs from downloaded file
+  ids <- readRDS(ids_file)
+
+
+  # Lookup data associated with status ids
+  rt <- rtweet::lookup_tweets(ids)
+}
 ```
 
 
-# Explore Twitter
 
-## Tweet frequency over time
+## General tweet prevalence over time
 
-The following summarizes Twitter data into a time series-like data frame. It is
-then plotted over time (in 2-hour increments).
-
-```{r Plot tweet frequency}
+```{r tweets_over_time, fig.height=7, fig.width=9}
 rt %>%
-  filter(created_at > as.POSIXct("2019-01-31")) %>%
-  ts_plot("2 hours", color = "transparent") +
+  ts_plot("30 minutes", color = "transparent") +
   geom_smooth(method = "loess",
               se = FALSE,
-              span = 0.1,
+              span = 0.05,
               size = 2,
-              colour = "#0066aa") +
+              color = "#0066aa") +
   geom_point(size = 5,
              shape = 21,
              fill = "#ADFF2F99",
-             colour = "#000000dd") +
+             color = "#000000dd") +
+
+  # ggplot2 theme 
   theme_minimal(base_size = 15) +
   theme(axis.text = element_text(colour = "#222222"),
-        plot.title = element_text(size = rel(1.2),
-                                  face = "bold"),
-        plot.subtitle = element_text(size = rel(0.9)),
+        plot.title = element_text(size = rel(1.7), face = "bold"),
+        plot.subtitle = element_text(size = rel(1.3)),
         plot.caption = element_text(colour = "#444444")) +
-  labs(title = "Frequency of tweets about #OpenConCascadia19 over time",
-       subtitle = "Twitter status counts aggregated using two-hour intervals",
+
+  # Caption information
+  labs(title = "Frequency of tweets about #NLMITC19 over time",
+       subtitle = "Twitter status counts aggregated using half-hour intervals",
        caption = "\n\nSource: Data gathered via Twitter's standard `search/tweets` API using rtweet",
-       x = NULL,
-       y = NULL)
+       x = NULL, y = NULL)
+```
+
+Makes sense considering there were two days of conference time.
+
+
+## Most prolific tweeters?
+
+```{r most_prolific_tweeter, fig.height=7, fig.width=9}
+rt %>%
+  group_by(screen_name) %>%
+  summarise(tweets = n()) %>%
+  ggplot(aes(x = tweets, y = reorder(screen_name, tweets))) +
+  geom_point() +
+
+  # Theme styling information
+  theme_minimal(base_size = 15) +
+  theme(axis.text = element_text(colour = "#222222"),
+        plot.title = element_text(size = rel(1.7), face = "bold"),
+        plot.subtitle = element_text(size = rel(1.3)),
+        plot.caption = element_text(colour = "#444444")) +
+
+  # Labels
+  labs(title = "Top tweeters using\n#NLMITC19 or #NLMIT19",
+       x = "Total number of tweets",
+       y = "Twitter username",
+       caption = "\n\nSource: Data gathered via Twitter's standard `search/tweets` API using rtweet")
 ```
 
 
-## Content sentiment as positive or negative
+## Relationship between follower count and tweet popularity
 
-Let's do some sentiment analysis of our tweets. But before that, let's clea up
-our tweets and remove some distractors from our analysis
+Do more followers have more popular tweets?
 
-```{r Clean tweets for sentiment}
-# Clean up tweet text
-rt <- rt %>%
+```{r}
+rt %>%
+  # Preprocess and count average favorites normalized by number of tweets
+  group_by(screen_name) %>%
+  mutate(avg_fav = mean(favorite_count)) %>%
+  ungroup() %>%
+  select(screen_name, avg_fav, followers_count) %>%
+  distinct()
+```
+
+
+## Chatterplot of tweet words
+
+```{r process_for_chatter}
+rt_no_stop <- rt %>%
+  # Just look at tweet text
+  select(text, favorite_count) %>%
+  
+  # Remove web links
+  mutate(text = str_replace_all(text, "https?[:graph:]+", "'")) %>%
+
   # Remove mentions
   # Rule are that names are alphanumeric and can have underscores.
   # Names can also be preceeded with "." or end with some punctuation
   # Twitter:
-  #   https://help.twitter.com/en/managing-your-account/twitter-username-rules
+  #   help.twitter.com/en/managing-your-account/twitter-username-rules
   # To avoid emails:
-  #   https://stackoverflow.com/questions/4424179/how-to-validate-a-twitter-username-using-regex#comment21201837_4424288
-  mutate(clean_text = str_replace_all(text,
-                                 "\\.?@([:alnum:]|_){1,15}(?![.A-Za-z])[:graph:]?",
-                                 "")) %>%
+  #   stackoverflow.com/questions/4424179/how-to-validate-a-twitter-username-using-regex#comment21201837_4424288
+  mutate(text = str_replace_all(text,
+                                "\\.?@([:alnum:]|_){1,15}(?![.A-Za-z])[:graph:]?",
+                                "")) %>%
 
-  # Remove hashtags
-  mutate(clean_text = str_replace_all(clean_text,
-                                 "#[:graph:]+",
-                                 "")) %>%
+  # Tokenize text to just single words
+  unnest_tokens(word, text) %>%
 
-  # Remove links
-  mutate(clean_text = str_replace_all(clean_text,
-                                 "https?[:graph:]+",
-                                 "'")) %>%
+  # Remove stop words (e.g., "a", "the", "and", etc)
+  anti_join(get_stopwords())
 
-  # Convert to lowercase
-  mutate(clean_text = str_to_lower(clean_text)) %>%
 
-  # Trim extra write space
-  mutate(clean_text = str_trim(clean_text)) %>%
+# Get average number of favorites
+rt_word_avg_fav <- rt_no_stop %>%
+  # Average favorite count
+  group_by(word) %>%
+  summarize(avg_fav = mean(favorite_count))
 
-  # Reduce repeated whitespace inside a string
-  # E.g. str_squish("hello    world") -> "hello world"
-  mutate(clean_text = str_squish(clean_text))
+
+# Count number of mentions
+rt_counts <- rt_no_stop %>%
+  # Create word counts
+  count(word, sort = TRUE)
+
+
+# Filter low counts and join counts and average favorite score
+chatter_rt <- rt_counts %>%
+  filter(n > 1) %>%
+  filter(word != "nlmitc19") %>%
+  left_join(rt_word_avg_fav, by = "word")
 ```
 
-Now that we've cleaned up the tweets a bit we can do some sentiment analysis!
+```{r plot_chatter, fig.height=7, fig.width=9}
+chatter_rt %>%
+  # Add small offset average favorite counts because some are zero and we log
+  # transform, which can introduce infinite values
+  mutate(avg_fav = avg_fav + 0.001) %>%
 
-```{r Perform sentiment}
-# Estimate sentiment for each tweet
-rt <- rt %>%
-  mutate(sentiment = get_sentiment(clean_text, "syuzhet"))
+  # Gather just top 100 mentions
+  top_n(100, wt = n) %>%
+  
+  ggplot(aes(x = avg_fav, y = n, label = word)) +
+  geom_text_repel(segment.alpha = 0,
+                  aes(colour = avg_fav, size = n)) +
 
-# Write function to round time into rounded var
-round_time <- function(x, sec) {
-  as.POSIXct(hms::hms(as.numeric(x) %/% sec * sec))
-}
+  # Set color gradient,log transform & customize legend
+  scale_color_gradient(low = "green3", high = "violetred", 
+                       trans = "log10",
+                       guide = guide_colourbar(direction = "horizontal",
+                                               title.position = "top")) +
+  # Set word size range & turn off legend
+  scale_size_continuous(range = c(3, 10),
+                        guide = FALSE) +
 
-# Plot by specified time interval (1-hours)
-rt %>%
-  mutate(time = round_time(created_at, 60 * 60)) %>%
-  group_by(time) %>%
-  summarise(sentiment = mean(sentiment, na.rm = TRUE)) %>%
-  mutate(valence = ifelse(sentiment > 0L, "Positive", "Negative")) %>%
-  ggplot(aes(x = time, y = sentiment)) +
-  geom_smooth(method = "loess",
-              span = 0.1,
-              colour = "#aa11aadd",
-              fill = "#bbbbbb11") +
-  geom_point(aes(fill = valence, colour = valence),
-             shape = 21,
-             alpha = 0.6,
-             size = 3.5) +
-  theme_minimal(base_size = 15) +
-  theme(legend.position = "none",
-        axis.text = element_text(colour = "#222222"),
-        plot.title = element_text(size = rel(1.2), face = "bold"),
-        plot.subtitle = element_text(size = rel(0.9)),
-        plot.caption = element_text(colour = "#444444")) +
-  scale_fill_manual(values = c(Positive = "#2244ee", Negative = "#dd2222")) +
-  scale_colour_manual(values = c(Positive = "#001155", Negative = "#550000")) +
-  labs(x = NULL,
-       y = NULL,
-       title = "Sentiment (valence) of OpenCon Cascadia tweets over time",
-       subtitle = "Mean sentiment of tweets aggregated in one-hour intervals",
-       caption = "\nSource: Data gathered using rtweet. Sentiment analysis done using syuzhet")
-```
-
-
-## Emoji Analysis
-
-### Setup for emoji analysis
-
-I thought it might be interesting to see what kinds of emojis were used during
-and around the conference.
-
-In hindsight, analyzing emojis in text took way longer than I expected. I didn't
-account for the fact that emojis are encoded in Unicode, which turned out was a
-non-trivial task.
-
-Here is the full official list of emojis:
-http://unicode.org/emoji/charts/full-emoji-list.html.
-
-Let's pull the official emoji table.
-
-```{r Get all emojis}
-emoji_page <- read_html("http://unicode.org/emoji/charts/full-emoji-list.html")
-emoji_tab <- emoji_page %>%
-  html_node("table") %>%
-  html_table(header = FALSE)
-```
-
-Now just gotta fix up this table to be usable.
-
-```{r Clean up emoji table}
-emoji_check <- emoji_tab %>%
-  # Subset columns and clean up table a bit
-  # Select X3 for the actual Unicode emoji
-  select(X1, X2, X15) %>%
-  rename(ID = X1, codes = X2, shortname = X15) %>%
-  filter(codes != "Code") %>%
-  filter(!str_detect(ID, "[:alpha:]")) %>%
-
-  # Separate rows with various number of emojis
-  mutate(num_spaces = str_count(codes, " ")) %>%
-  nest(-num_spaces) %>%
-  mutate(data = map(data, function(df) {
-    separate_rows(df, codes, sep = " ")
-  })) %>%
-  unnest() %>%
-  select(-num_spaces) %>%
-
-  # Need to remove the Unicode "U" character to use in regular expressions
-  # The stringi package converts the Unicode characters to lowercase.
-  mutate(hexcode = str_sub(codes, 3)) %>%
-  mutate(hexcode = str_to_lower(hexcode))
-```
-
-Now that we have this table, we can do some analyses!
-
-```{r Extract emojis}
-# Convert text to translate Unicode characters of emojis
-rt <- rt %>%
-  mutate(nonunicode_text = stri_escape_unicode(text)) %>%
-  mutate(nonunicode_text = str_to_lower(nonunicode_text))
-
-# Create regex to search for any emojis
-emoji_regex <- emoji_check %>%
-  mutate(hexcode = stri_escape_unicode(hexcode)) %>%
-  pull(hexcode) %>%
-  paste0(collapse = "|")
-
-# Extract emojis and count them
-rt <- rt %>%
-  mutate(num_emojis = str_count(nonunicode_text, emoji_regex)) %>%
-  mutate(emoji_list = str_extract_all(nonunicode_text, emoji_regex)) %>%
-  # Note
-  mutate(another_count = map(emoji_list, length))
+  # Use log-scale for x-axis
+  scale_x_log10() +
+  ggtitle(paste0("Top 100 words from ",
+                  nrow(rt),
+                 " #NLMITC19 tweets, by frequency"),
+          subtitle = "Word frequency (size) ~ Avg number of favorites (color)") + 
+  labs(y = "Word frequency across all tweets",
+       x = "Avg number of favorites in tweets containing word (log scale)") +
+  
+  # minimal theme & customizations
+  theme_minimal() +
+  theme(legend.position = c(0.20, 0.99),
+        legend.justification = c("right","top"),
+        panel.grid.major = element_line(colour = "whitesmoke"))
 ```
 
 
-### Emoji use over time
+## Resources that have helped me along the way
 
-```{r}
-
-```
-
-
-## Explore social network of Twitter attendees
-
-```{r}
-
-```
+- [rstudioconf_tweets](https://github.com/mkearney/rstudioconf_tweets)
+- [RIP wordclouds, long live CHATTERPLOTS](https://towardsdatascience.com/rip-wordclouds-long-live-chatterplots-e76a76896098)
 
 
-## Top associated hashtags
-
-What were the most associated hashtags with OpenCon Cascadia?
-
-```{r}
-
-```
-
-
-## How verbose are people tweeting?
-
-```{r}
-
-```
-
-
-## Casing variation of hashtag
-
-Which one was more popular? `#OpenConCascadia19`? Or `#openconcascadia19`?
-
-```{r}
-
-```
-
-## Create chatterplot of common words
-
-```{r}
-
-```
-
-
-# Commonly Shared Resources and Links
-
-```{r}
-
-```
-
-
-# Helpful Resources in Analysis
-
-Here are all of the links that have helped me analyze all of the above.
-
-- Example Twitter analyses
-  - [Data collection and visualization of #NCA17 tweets](https://github.com/mkearney/NCA17)
-  - [Tracking and analyzing tweets about the 2018 National Communication Conference](https://github.com/mkearney/NCA18)
-  - [A repository for tracking tweets about rstudio::conf](https://github.com/mkearney/rstudioconf_tweets)
-- [Search emoji using `stringr`](https://stackoverflow.com/a/43370630) - I was
-  going to try and remove emojis for my analysis, but I could find a way. This
-  was the closest I could get to removing.
-- [Convert unicodes strings](https://stackoverflow.com/a/41924011/) - Although
-  this does not give me the correct answer, it did lead me to the `stringi`
-  package, which does have a function `stri_escape_unicode()` that does have the
-  functionality that I need to work with Unicode characters.
-- [`emo` R package](https://github.com/hadley/emo) - For emojis.
-- [Can We Please Stop Using Word Clouds](https://towardsdatascience.com/can-we-please-stop-using-word-clouds-eca2bbda7b9d) -
-  Gave me the idea of using Sankey diagrams and then giving me the idea of using
-  LDA from mentioning cluster maps.
-- [RIP wordclouds, long live CHATTERPLOTS](https://towardsdatascience.com/rip-wordclouds-long-live-chatterplots-e76a76896098) -
-  I found this alternative to word clouds really inspiring and useful.
-- [Text Mining with R](https://www.tidytextmining.com) - General everything help
-  on analyzing text, which I have no experience with.
-
-# Session Information
+## Session information
 
 ```{r}
 sessionInfo()
 ```
+
