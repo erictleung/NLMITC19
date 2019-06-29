@@ -6,8 +6,6 @@
 -   [Relationship between follower count and tweet
     popularity](#relationship-between-follower-count-and-tweet-popularity)
 -   [Chatterplot of tweet words](#chatterplot-of-tweet-words)
--   [Resources that have helped me along the
-    way](#resources-that-have-helped-me-along-the-way)
 -   [Session information](#session-information)
 
 Load libraries
@@ -56,6 +54,9 @@ But instead, here I’ll just look up the status IDs.
 
 General tweet prevalence over time
 ----------------------------------
+
+Code modified from
+[`rstudioconf_tweets`](https://github.com/mkearney/rstudioconf_tweets).
 
     rt %>%
       ts_plot("30 minutes", color = "transparent") +
@@ -115,190 +116,42 @@ Relationship between follower count and tweet popularity
 
 Do more followers have more popular tweets?
 
+I take the average number of favorite of an individual’s tweets and
+normalize it based on the total number of tweets.
+
     rt %>%
       # Preprocess and count average favorites normalized by number of tweets
       group_by(screen_name) %>%
       mutate(avg_fav = mean(favorite_count)) %>%
+      mutate(avg_norm_fav = avg_fav / n()) %>%
       ungroup() %>%
-      select(screen_name, avg_fav, followers_count) %>%
-      distinct()
+      select(screen_name, avg_fav, avg_norm_fav, followers_count) %>%
+      distinct() %>%
 
-<table>
-<thead>
-<tr class="header">
-<th style="text-align: left;">screen_name</th>
-<th style="text-align: right;">avg_fav</th>
-<th style="text-align: right;">followers_count</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td style="text-align: left;">mirzakhan_</td>
-<td style="text-align: right;">2.0000000</td>
-<td style="text-align: right;">12</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">BioMedDataSci</td>
-<td style="text-align: right;">1.0000000</td>
-<td style="text-align: right;">174</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">ColumbiaDBMI</td>
-<td style="text-align: right;">4.6666667</td>
-<td style="text-align: right;">175</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">FSPH_IUPUI</td>
-<td style="text-align: right;">2.6666667</td>
-<td style="text-align: right;">885</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">varunamohan</td>
-<td style="text-align: right;">0.5000000</td>
-<td style="text-align: right;">141</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">JamiJackson</td>
-<td style="text-align: right;">7.5000000</td>
-<td style="text-align: right;">1250</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">real_kev</td>
-<td style="text-align: right;">10.5000000</td>
-<td style="text-align: right;">282</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">Regenstrief</td>
-<td style="text-align: right;">6.0000000</td>
-<td style="text-align: right;">1892</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">hshoch</td>
-<td style="text-align: right;">6.0000000</td>
-<td style="text-align: right;">350</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">DanielPanyard</td>
-<td style="text-align: right;">3.3333333</td>
-<td style="text-align: right;">52</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">ngehlenborg</td>
-<td style="text-align: right;">9.0000000</td>
-<td style="text-align: right;">2678</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">EricFeczko</td>
-<td style="text-align: right;">3.0000000</td>
-<td style="text-align: right;">162</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">dpugrad01</td>
-<td style="text-align: right;">5.7142857</td>
-<td style="text-align: right;">671</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">erictleung</td>
-<td style="text-align: right;">0.9107143</td>
-<td style="text-align: right;">653</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">titusschleyer</td>
-<td style="text-align: right;">10.6000000</td>
-<td style="text-align: right;">950</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">aaron_coyner</td>
-<td style="text-align: right;">6.0000000</td>
-<td style="text-align: right;">123</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">JoshHerigon</td>
-<td style="text-align: right;">12.0000000</td>
-<td style="text-align: right;">947</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">griffinashleyc</td>
-<td style="text-align: right;">0.0000000</td>
-<td style="text-align: right;">73</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">steminformatics</td>
-<td style="text-align: right;">8.0000000</td>
-<td style="text-align: right;">118</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">jmschabdach</td>
-<td style="text-align: right;">2.0000000</td>
-<td style="text-align: right;">0</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">williamhersh</td>
-<td style="text-align: right;">7.8000000</td>
-<td style="text-align: right;">2460</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">NateApathy</td>
-<td style="text-align: right;">4.3333333</td>
-<td style="text-align: right;">451</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">bacordier</td>
-<td style="text-align: right;">6.5000000</td>
-<td style="text-align: right;">117</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">EDHGates</td>
-<td style="text-align: right;">0.5000000</td>
-<td style="text-align: right;">14</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">InSiliConjurer</td>
-<td style="text-align: right;">3.0000000</td>
-<td style="text-align: right;">108</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">embimd</td>
-<td style="text-align: right;">9.0000000</td>
-<td style="text-align: right;">1537</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">TelementalHlth</td>
-<td style="text-align: right;">15.0000000</td>
-<td style="text-align: right;">47</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">vekerchberger</td>
-<td style="text-align: right;">2.0000000</td>
-<td style="text-align: right;">23</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">DBMI_Pitt</td>
-<td style="text-align: right;">3.0000000</td>
-<td style="text-align: right;">793</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">SciPolSam</td>
-<td style="text-align: right;">3.0000000</td>
-<td style="text-align: right;">164</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">AJAveritt</td>
-<td style="text-align: right;">8.0000000</td>
-<td style="text-align: right;">57</td>
-</tr>
-<tr class="even">
-<td style="text-align: left;">MollyJCarroll</td>
-<td style="text-align: right;">4.5000000</td>
-<td style="text-align: right;">94</td>
-</tr>
-<tr class="odd">
-<td style="text-align: left;">andrewsjourney</td>
-<td style="text-align: right;">3.0000000</td>
-<td style="text-align: right;">116</td>
-</tr>
-</tbody>
-</table>
+      # Offset to not create infinite values when log transforming
+      mutate(followers_count = followers_count + 0.001) %>%
+      mutate(avg_norm_fav = avg_norm_fav + 0.001) %>%
+
+      # Plot results
+      ggplot(aes(x = followers_count, y = avg_norm_fav, label = screen_name)) +
+      geom_text_repel() +
+      geom_point() +
+
+      # Use log-scale for x-axis and y-axis
+      scale_x_log10() +
+      labs(title = "Average normalized number of favorites\nversus user follower count",
+           x = "Number of followers (log scale)",
+           y = "Average normalized number of favorites",
+           caption = "\nSource: Data gathered via Twitter's standard `search/tweets` API using rtweet") +
+
+      # Theme styling information
+      theme_minimal(base_size = 15) +
+      theme(axis.text = element_text(colour = "#222222"),
+            plot.title = element_text(size = rel(1.7), face = "bold"),
+            plot.subtitle = element_text(size = rel(1.3)),
+            plot.caption = element_text(colour = "#444444"))
+
+![](README_files/figure-markdown_strict/follower_vs_favorites-1.png)
 
 Chatterplot of tweet words
 --------------------------
@@ -348,6 +201,9 @@ Chatterplot of tweet words
       filter(word != "nlmitc19") %>%
       left_join(rt_word_avg_fav, by = "word")
 
+Code below modified from [“RIP wordclouds, long live
+CHATTERPLOTS”](https://towardsdatascience.com/rip-wordclouds-long-live-chatterplots-e76a76896098).
+
     chatter_rt %>%
       # Add small offset average favorite counts because some are zero and we log
       # transform, which can introduce infinite values
@@ -376,7 +232,8 @@ Chatterplot of tweet words
                      " #NLMITC19 tweets, by frequency"),
               subtitle = "Word frequency (size) ~ Avg number of favorites (color)") + 
       labs(y = "Word frequency across all tweets",
-           x = "Avg number of favorites in tweets containing word (log scale)") +
+           x = "Avg number of favorites in tweets containing word (log scale)",
+           colour = "Avg num of favs (log)") +
       
       # minimal theme & customizations
       theme_minimal() +
@@ -385,13 +242,6 @@ Chatterplot of tweet words
             panel.grid.major = element_line(colour = "whitesmoke"))
 
 ![](README_files/figure-markdown_strict/plot_chatter-1.png)
-
-Resources that have helped me along the way
--------------------------------------------
-
--   [rstudioconf\_tweets](https://github.com/mkearney/rstudioconf_tweets)
--   [RIP wordclouds, long live
-    CHATTERPLOTS](https://towardsdatascience.com/rip-wordclouds-long-live-chatterplots-e76a76896098)
 
 Session information
 -------------------
@@ -426,14 +276,13 @@ Session information
     ## [13] withr_2.1.2       modelr_0.1.4      readxl_1.3.1     
     ## [16] plyr_1.8.4        munsell_0.5.0     gtable_0.3.0     
     ## [19] cellranger_1.1.0  rvest_0.3.2       evaluate_0.13    
-    ## [22] labeling_0.3      knitr_1.22        highr_0.8        
-    ## [25] broom_0.5.1       tokenizers_0.2.1  Rcpp_1.0.1       
-    ## [28] scales_1.0.0      backports_1.1.3   jsonlite_1.6     
-    ## [31] stopwords_0.9.0   hms_0.4.2         digest_0.6.18    
-    ## [34] stringi_1.4.3     grid_3.5.0        cli_1.1.0        
-    ## [37] tools_3.5.0       magrittr_1.5      lazyeval_0.2.2   
-    ## [40] janeaustenr_0.1.5 crayon_1.3.4      pkgconfig_2.0.2  
-    ## [43] Matrix_1.2-16     xml2_1.2.0        lubridate_1.7.4  
-    ## [46] assertthat_0.2.1  rmarkdown_1.12    httr_1.4.0       
-    ## [49] rstudioapi_0.10   R6_2.4.0          nlme_3.1-137     
-    ## [52] compiler_3.5.0
+    ## [22] labeling_0.3      knitr_1.22        broom_0.5.1      
+    ## [25] tokenizers_0.2.1  Rcpp_1.0.1        scales_1.0.0     
+    ## [28] backports_1.1.3   jsonlite_1.6      stopwords_0.9.0  
+    ## [31] hms_0.4.2         digest_0.6.18     stringi_1.4.3    
+    ## [34] grid_3.5.0        cli_1.1.0         tools_3.5.0      
+    ## [37] magrittr_1.5      lazyeval_0.2.2    janeaustenr_0.1.5
+    ## [40] crayon_1.3.4      pkgconfig_2.0.2   Matrix_1.2-16    
+    ## [43] xml2_1.2.0        lubridate_1.7.4   assertthat_0.2.1 
+    ## [46] rmarkdown_1.12    httr_1.4.0        rstudioapi_0.10  
+    ## [49] R6_2.4.0          nlme_3.1-137      compiler_3.5.0

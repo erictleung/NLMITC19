@@ -64,6 +64,10 @@ if (file.exists(nlmitc19_file)) {
 
 ## General tweet prevalence over time
 
+Code modified from [`rstudioconf_tweets`][mk].
+
+[mk]: https://github.com/mkearney/rstudioconf_tweets
+
 ```{r tweets_over_time, fig.height=7, fig.width=9}
 rt %>%
   ts_plot("30 minutes", color = "transparent") +
@@ -122,14 +126,41 @@ rt %>%
 
 Do more followers have more popular tweets?
 
-```{r}
+I take the average number of favorite of an individual's tweets and normalize it
+based on the total number of tweets.
+
+```{r follower_vs_favorites, fig.height=7, fig.width=9}
 rt %>%
   # Preprocess and count average favorites normalized by number of tweets
   group_by(screen_name) %>%
   mutate(avg_fav = mean(favorite_count)) %>%
+  mutate(avg_norm_fav = avg_fav / n()) %>%
   ungroup() %>%
-  select(screen_name, avg_fav, followers_count) %>%
-  distinct()
+  select(screen_name, avg_fav, avg_norm_fav, followers_count) %>%
+  distinct() %>%
+
+  # Offset to not create infinite values when log transforming
+  mutate(followers_count = followers_count + 0.001) %>%
+  mutate(avg_norm_fav = avg_norm_fav + 0.001) %>%
+
+  # Plot results
+  ggplot(aes(x = followers_count, y = avg_norm_fav, label = screen_name)) +
+  geom_text_repel() +
+  geom_point() +
+
+  # Use log-scale for x-axis and y-axis
+  scale_x_log10() +
+  labs(title = "Average normalized number of favorites\nversus user follower count",
+       x = "Number of followers (log scale)",
+       y = "Average normalized number of favorites",
+       caption = "\nSource: Data gathered via Twitter's standard `search/tweets` API using rtweet") +
+
+  # Theme styling information
+  theme_minimal(base_size = 15) +
+  theme(axis.text = element_text(colour = "#222222"),
+        plot.title = element_text(size = rel(1.7), face = "bold"),
+        plot.subtitle = element_text(size = rel(1.3)),
+        plot.caption = element_text(colour = "#444444"))
 ```
 
 
@@ -181,6 +212,10 @@ chatter_rt <- rt_counts %>%
   left_join(rt_word_avg_fav, by = "word")
 ```
 
+Code below modified from ["RIP wordclouds, long live CHATTERPLOTS"][wordcloud].
+
+[wordcloud]: https://towardsdatascience.com/rip-wordclouds-long-live-chatterplots-e76a76896098
+
 ```{r plot_chatter, fig.height=7, fig.width=9}
 chatter_rt %>%
   # Add small offset average favorite counts because some are zero and we log
@@ -210,7 +245,8 @@ chatter_rt %>%
                  " #NLMITC19 tweets, by frequency"),
           subtitle = "Word frequency (size) ~ Avg number of favorites (color)") + 
   labs(y = "Word frequency across all tweets",
-       x = "Avg number of favorites in tweets containing word (log scale)") +
+       x = "Avg number of favorites in tweets containing word (log scale)",
+       colour = "Avg num of favs (log)") +
   
   # minimal theme & customizations
   theme_minimal() +
@@ -218,12 +254,6 @@ chatter_rt %>%
         legend.justification = c("right","top"),
         panel.grid.major = element_line(colour = "whitesmoke"))
 ```
-
-
-## Resources that have helped me along the way
-
-- [rstudioconf_tweets](https://github.com/mkearney/rstudioconf_tweets)
-- [RIP wordclouds, long live CHATTERPLOTS](https://towardsdatascience.com/rip-wordclouds-long-live-chatterplots-e76a76896098)
 
 
 ## Session information
