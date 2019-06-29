@@ -21,7 +21,8 @@ Load libraries
 Query data
 ----------
 
-Below is the code to query the Twitter data for the `#NLMITC19`.
+Below is the code to query the Twitter data for the `#NLMITC19`. I ran
+this at 2019-06-28 22:50.
 
     rt <- search_tweets("#NLMITC19 OR #NLMIT19", n = 1800, include_rts = FALSE)
 
@@ -138,9 +139,8 @@ normalize it based on the total number of tweets.
       geom_point() +
 
       # Use log-scale for x-axis and y-axis
-      scale_x_log10() +
       labs(title = "Average normalized number of favorites\nversus user follower count",
-           x = "Number of followers (log scale)",
+           x = "Number of followers",
            y = "Average normalized number of favorites",
            caption = "\nSource: Data gathered via Twitter's standard `search/tweets` API using rtweet") +
 
